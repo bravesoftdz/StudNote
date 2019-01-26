@@ -38,8 +38,8 @@ freely, subject to the following restrictions:
 | File | Contents | 
 | --- | --- |
 | .gitignore | Git ignores the files in this file |
-| ToolLib.pas | Information view of the programme |
-| Main.pas | The main view of the programme |
+| AboutSN.pas | Information view of the programme |
+| FormMain.pas | The main view of the programme |
 | StudNote.dpk | The compiler project file |
 | StudNote.dproj | The MSBUILD project file |
 | README.md | The readme for this project |
