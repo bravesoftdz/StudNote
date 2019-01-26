@@ -98,6 +98,7 @@ var
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   MainForm.KeyPreview := True;
+//  ------------------------------------  //
   MathEdit.NumbersOnly := True;
   FreEdit.NumbersOnly := True;
   EngEdit.NumbersOnly := True;
