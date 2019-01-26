@@ -15,6 +15,7 @@ type
     Url: TLinkLabel;
     procedure UrlLinkClick(Sender: TObject; const Link: string;
       LinkType: TSysLinkType);
+    procedure FormCreate(Sender: TObject);
   private
     { Déclarations privées }
   public
@@ -27,6 +28,11 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TfrmAboutSN.FormCreate(Sender: TObject);
+begin
+frmAboutSN.BorderIcons:=[biSystemMenu] ;
+end;
 
 procedure TfrmAboutSN.UrlLinkClick(Sender: TObject; const Link: string;
   LinkType: TSysLinkType);
