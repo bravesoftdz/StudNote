@@ -1,6 +1,6 @@
 # StudNote
 save student grades and calculate the average
-![](StudNote_.png) 
+![](StudNote.png) 
 
 
 # Features  
