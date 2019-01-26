@@ -227,6 +227,9 @@ begin
   ShowCellHint(X, Y);
 end;
 
+{
+  Show Cell Hint
+}
 procedure TMainForm.ShowCellHint(X, Y: Integer);
 var
   ACol, ARow: Integer;
