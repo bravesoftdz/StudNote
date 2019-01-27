@@ -1,0 +1,503 @@
+unit ChartConnec;
+
+interface
+
+uses
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.ComCtrls,
+  Vcl.Buttons, Spring.Collections,
+  SQLiteTable3,
+  Spring.Persistence.Core.Interfaces,
+  Spring.Persistence.Core.Session, EmpConnection, Spring.Persistence.Adapters.SQLite, Spring.Persistence.Core.DatabaseManager,system.Threading, dxScreenTip, dxCustomHint, cxHint, cxClasses;
+
+const
+  DnameDataBase = 'Daten\383ServerDB.db';
+
+type
+  TarrEmp = record
+    ID: string;
+    Min: Integer;
+  end;
+
+type
+  TfrmChartConnec = class(TForm)
+    Panel: TPanel;
+    StatusBar1: TStatusBar;
+    lbValues: TListBox;
+    leID: TLabeledEdit;
+    leMaxi: TLabeledEdit;
+    leMin: TLabeledEdit;
+    Panel2: TPanel;
+    PaintBox: TPaintBox;
+    bAbout: TBitBtn;
+    bAlgo: TBitBtn;
+    bClose: TBitBtn;
+    bSave: TBitBtn;
+    bStart: TBitBtn;
+    BitBtnSearch: TBitBtn;
+    TipRepository: TdxScreenTipRepository;
+    ExecuteTip: TdxScreenTip;
+    ControlBarTip: TdxScreenTip;
+    HintStyleController: TcxHintStyleController;
+    tmrHint: TTimer;
+    procedure bStartClick(Sender: TObject);
+    procedure bAlgoClick(Sender: TObject);
+    procedure bCloseClick(Sender: TObject);
+    procedure bSaveClick(Sender: TObject);
+    procedure bAboutClick(Sender: TObject);
+    procedure lbValuesDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+    procedure FormCreate(Sender: TObject);
+    procedure FormResize(Sender: TObject);
+    procedure FormShow(Sender: TObject);
+    procedure BitBtnSearchClick(Sender: TObject);
+    procedure leIDChange(Sender: TObject);
+    procedure leIDKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure leIDKeyPress(Sender: TObject; var Key: Char);
+    procedure tmrHintTimer(Sender: TObject);
+  private
+    { Déclarations privées }
+    v, vmax, vmin, n: Integer;
+    pasx, pasy: real;
+    FConnection: IDBConnection;
+    FDatabase: TSQLiteDatabase;
+    FEmpConnec: IList<TEmpConnec>;
+    FSession: TSession;
+     FTask: Itask;
+
+    procedure TraceGraphe;
+    procedure DoReLoadProducts;
+    procedure FulltheTables;
+    procedure DoCheckEntities;
+    function MaxIntValue(const Data: array of TarrEmp): Integer;
+    function MinIntValue(const Data: array of TarrEmp; const nb: Integer): Integer;
+    procedure ShowSearchHint;
+  public
+    { Déclarations publiques }
+  end;
+
+var
+  frmChartConnec: TfrmChartConnec;
+
+implementation
+
+{$R *.dfm}
+
+uses uAlgo, uAbout, System.IOUtils, System.Character;
+
+var
+  arrEmp: array [0 .. 99] of TarrEmp;
+
+procedure TfrmChartConnec.bCloseClick(Sender: TObject);
+begin
+  Close
+end;
+
+procedure TfrmChartConnec.BitBtnSearchClick(Sender: TObject);
+var
+  I: Integer;
+begin
+  Screen.Cursor := crHourGlass;
+  lbValues.Clear;
+  PaintBox.Refresh;
+  // lbValues.Items.Add(leStartV.Text);
+  // v:=StrtoInt(leStartV.Text);
+  n := 0;
+  vmax := MaxIntValue(arrEmp);
+
+  leMaxi.Text := vmax.ToString;
+
+  for I := Low(arrEmp) to High(arrEmp) do
+    if (arrEmp[I].ID = leID.Text) then
+    begin
+      lbValues.Items.Add(arrEmp[I].ID + ':' + arrEmp[I].Min.ToString);
+      inc(n);
+    end;
+  vmin := MinIntValue(arrEmp, n);
+  leMin.Text := vmin.ToString;
+  Refresh;
+  Screen.Cursor := crDefault;
+  TraceGraphe;
+
+  ShowSearchHint;
+
+end;
+
+procedure TfrmChartConnec.bAboutClick(Sender: TObject);
+begin
+  with fAbout do
+  begin
+    ProductName.Caption := 'Chart Connection';
+    Version.Caption := 'Version 1.0';
+    ShowModal;
+  end;
+end;
+
+procedure TfrmChartConnec.bAlgoClick(Sender: TObject);
+begin
+  fAlgorithme.ShowModal
+end;
+
+{
+  function CopierEcran(xe, ye, we, he: integer): tBitMap;
+  // xe, ye = Coordonnées écran de l'angle supérieur gauche de la Zone à copier.
+  // we, he = Width et Height de la Zone à copier
+  var HandleDC: HDC; Picture: TPicture;
+  begin
+  HandleDC := GetDC(GetDesktopWindow);
+  Picture:= TPicture.Create;
+  try
+  Picture.Bitmap.PixelFormat := pf32bit;
+  Picture.Bitmap.Width := we;
+  Picture.Bitmap.Height := he;
+  BitBlt(Picture.Bitmap.Canvas.Handle, 0, 0, we, he,
+  HandleDC, xe, ye, SrcCopy); //recopie l'image de la région d'écran dans PictureBureau
+  finally
+  Result := tBitMap.create;
+  Result.Assign(Picture.BitMap);
+  ReleaseDC(GetDesktopWindow, HandleDC);
+  end;
+  end;
+  // CopierEcran(xe,ye,we,he : integer);
+
+  // sauver Paintbox sur disque
+  var
+  Bitmap: TBitmap;
+  Source: TRect;
+  Dest: TRect;
+  begin
+  Bitmap := TBitmap.Create;
+  try
+  with Bitmap do
+  begin
+  Width := MyPaintBox.Width;
+  Height := MyPaintBox.Height;
+  Dest := Rect(0, 0, Width, Height);
+  end;
+  with MyPaintBox do
+  Source := Rect(0, 0, Width, Height);
+  Bitmap.Canvas.CopyRect(Dest, MyPaintBox.Canvas, Source);
+  Bitmap.SaveToFile('MYFILE.BMP');
+  finally
+  Bitmap.Free;
+  end;
+  end;
+}
+
+function TfrmChartConnec.MaxIntValue(const Data: array of TarrEmp): Integer;
+var
+  I: Integer;
+begin
+  Result := Data[Low(Data)].Min;
+  for I := Low(Data) + 1 to High(Data) do
+    if Result < Data[I].Min then
+      Result := Data[I].Min;
+end;
+
+function TfrmChartConnec.MinIntValue(const Data: array of TarrEmp; const nb: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := Data[Low(Data)].Min;
+  for I := Low(Data) + 1 to nb - 1 do
+    if Result > Data[I].Min then
+      Result := Data[I].Min;
+end;
+
+procedure TfrmChartConnec.tmrHintTimer(Sender: TObject);
+begin
+  if Assigned(FTask) then
+  begin
+    if not(FTask.Status = TTaskStatus.Running) then
+    begin
+      tmrHint.Enabled := False;
+      HintStyleController.HideHint;
+      ControlBarTip.Description.Text := '';
+    end;
+  end;
+end;
+
+procedure TfrmChartConnec.bStartClick(Sender: TObject);
+
+var
+  I: Integer;
+begin
+  Screen.Cursor := crHourGlass;
+  lbValues.Clear;
+  // lbValues.Items.Add(leStartV.Text);
+  // v:=StrtoInt(leStartV.Text);
+  n := 0;
+  vmax := MaxIntValue(arrEmp);
+
+  leMaxi.Text := vmax.ToString;
+
+  for I := Low(arrEmp) to High(arrEmp) do
+    if (arrEmp[I].ID <> '') then
+    begin
+      lbValues.Items.Add(arrEmp[I].ID + ':' + arrEmp[I].Min.ToString);
+      inc(n);
+    end;
+  vmin := MinIntValue(arrEmp, n);
+  leMin.Text := vmin.ToString;
+  // while v>1 do
+  // begin
+  // if odd(v) then v:=v*3+1 else v:=v div 2;
+  // if v>vmax then vmax:=v;
+  // inc(n);
+  // lbValues.Items.Add(v.ToString);
+  // leMaxi.Text:=vmax.ToString;
+  // leIterations.Text:=n.ToString;
+  Refresh;
+  // end;
+  Screen.Cursor := crDefault;
+  TraceGraphe
+end;
+
+procedure TfrmChartConnec.FormCreate(Sender: TObject);
+var
+  strAppPfad: string;
+begin
+  with lbValues do
+    Style := lbOwnerDrawFixed;
+
+  strAppPfad := ExtractFilePath(Application.ExeName);
+
+  FDatabase := TSQLiteDatabase.Create(Self);
+
+  FDatabase.Filename := TPath.Combine(TPath.GetLibraryPath, strAppPfad + DnameDataBase);
+  FConnection := TSQLiteConnectionAdapter.Create(FDatabase);
+
+  FConnection.AutoFreeConnection := true;
+  FConnection.Connect;
+  FSession := TSession.Create(FConnection);
+  FEmpConnec := TCollections.CreateObjectList<TEmpConnec>(true);
+
+  DoCheckEntities;
+  FulltheTables;
+
+end;
+
+procedure TfrmChartConnec.FulltheTables;
+var
+  I: Integer;
+  posMor, posLun, posEve: Integer;
+begin
+  // btnLstBoxDuration.StyleElements := [];
+  // posMor := 1;
+  // posLun := 1;
+  // posEve := 1;
+
+  for I := 0 to FEmpConnec.count - 1 do
+  begin
+    arrEmp[I].ID := FEmpConnec[I].EmployeeID;
+    arrEmp[I].Min := FEmpConnec[I].EmployeeMin;
+    lbValues.Items.Add(FEmpConnec[I].EmployeeID);
+
+  end;
+  // pnlMor.Caption := IntToStr(posMor - 1);
+  // pnlLun.Caption := IntToStr(posLun - 1);
+  // pnlEve.Caption := IntToStr(posEve - 1);
+  lbValues.Invalidate;
+end;
+
+procedure TfrmChartConnec.DoCheckEntities;
+var
+  LDBManager: TDatabaseManager;
+begin
+  LDBManager := TDatabaseManager.Create(FConnection);
+  try
+    if not LDBManager.EntityExists(TEmpConnec) then
+    begin
+      LDBManager.BuildDatabase;
+      DoReLoadProducts;
+    end;
+  finally
+    LDBManager.Free;
+  end;
+end;
+
+procedure TfrmChartConnec.DoReLoadProducts;
+begin
+  lbValues.Items.BeginUpdate;
+  try
+    FEmpConnec := FSession.FindAll<TEmpConnec>;
+    FulltheTables;
+  finally
+    lbValues.Items.EndUpdate;
+  end;
+end;
+
+procedure TfrmChartConnec.FormResize(Sender: TObject);
+begin
+  bStartClick(nil);
+
+end;
+
+procedure TfrmChartConnec.FormShow(Sender: TObject);
+begin
+  BitBtnSearch.Enabled := length(leID.Text) = 5;
+  if FConnection.IsConnected then
+  begin
+    DoReLoadProducts;
+  end
+end;
+
+procedure TfrmChartConnec.lbValuesDrawItem(Control: TWinControl; Index: Integer; Rect: TRect; State: TOwnerDrawState);
+
+var
+  LB: TListBox;
+  dTop, dLeft: Integer;
+  Size: TSize;
+begin
+  if not(Control is TListBox) then
+    Exit;
+  LB := Control as TListBox;
+
+  Size := LB.Canvas.TextExtent(LB.Items[Index]);
+  dTop := (LB.ItemHeight - Size.cy) div 2;
+  dLeft := ((Rect.Right - Rect.Left) - Size.cx) div 2;
+
+  LB.Canvas.TextRect(Rect, Rect.Left + 2 + dLeft, Rect.Top + dTop, LB.Items[Index]);
+end;
+
+procedure TfrmChartConnec.leIDChange(Sender: TObject);
+begin
+  if (length(leID.Text) < 5) then
+    BitBtnSearch.Enabled := False
+  else
+    BitBtnSearch.Enabled := true;
+  if (length(leID.Text) >= 2) then
+    leID.NumbersOnly := true
+  else
+  begin
+    leID.NumbersOnly := False;
+  end;
+
+end;
+
+procedure TfrmChartConnec.ShowSearchHint;
+Begin
+      ControlBarTip.Description.Text := 'Search,Result : ' + (n).ToString;
+    FTask := TTask.run(
+      procedure
+      begin
+        tmrHint.Interval := 2000;
+        tmrHint.Enabled := true;
+
+        TThread.Synchronize(nil,
+          procedure
+          begin
+            if (ControlBarTip.Description.Text <> '') then
+
+              (HintStyleController.HintStyle as TdxScreenTipStyle).ShowScreenTip(0, 0, ControlBarTip);
+            //
+            // HintStyleController.HideHint;
+          end);
+
+      end);
+End;
+
+procedure TfrmChartConnec.leIDKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if ((Key = VK_RETURN) and (length(leID.Text) = 5)) then
+  begin
+    BitBtnSearchClick(nil);
+    ShowSearchHint;
+
+  end;
+  end;
+
+
+  procedure TfrmChartConnec.leIDKeyPress(Sender: TObject; var Key: Char);
+  begin
+    if ((TLabeledEdit(Sender).SelStart = 0) or (TLabeledEdit(Sender).SelStart = 1)) then
+    begin
+      if Key in ['A' .. 'Z', 'a' .. 'z', #8, #13, #$D] then
+      begin
+        if TCharacter.IsLetter(Key) then
+          Key := UpCase(Key)
+
+      end
+      else
+        Key := #0;
+
+    end;
+
+  end;
+
+  procedure TfrmChartConnec.TraceGraphe;
+
+  var
+    I, Ox, Oy: Integer;
+  begin
+    with PaintBox do
+    begin
+      if frmChartConnec.WindowState = wsMaximized then
+        Font.Size := 11
+      else
+        Font.Size := 11;
+      Ox := 40;
+      Oy := ClientHeight - 40;
+      pasx := (Clientwidth - 80) / n;
+      pasy := (ClientHeight - 80) / vmax;
+      Canvas.pen.width := 2;
+      // Axe horizontal
+      Canvas.MoveTo(Ox, Oy);
+      Canvas.LineTo(trunc(Ox + pasx * n), Oy);
+      // Axe vertical
+      Canvas.MoveTo(Ox, Oy);
+      Canvas.LineTo(Ox, Oy - trunc(pasy * vmax));
+
+      Canvas.pen.width := 1;
+      Canvas.pen.Color := clMaroon;
+      Canvas.Brush.Color := clAqua;
+      for I := 0 to pred(n) do
+      begin
+        v := arrEmp[I].Min;
+        Canvas.Rectangle(trunc(Ox + pasx * I), Oy, trunc(Ox + pasx * succ(I)), trunc(Oy - pasy * v));
+        if v = vmax then
+          Canvas.Font.Style := [fsBold]
+        else
+          Canvas.Font.Style := [];
+
+        Canvas.TextOut(trunc(Ox + pasx * I) + 5, trunc(Oy - pasy * v) + 5, IntToStr(arrEmp[I].Min) + Char(32) + 'min');
+        Canvas.TextOut(trunc(Ox + pasx * I) + (frmChartConnec.width div 25), trunc(Oy - pasy * v) - (frmChartConnec.Height div 25) + 5, arrEmp[I].ID);
+      end;
+    end;
+
+  end;
+
+  procedure TfrmChartConnec.bSaveClick(Sender: TObject);
+  var
+    bmp: tBitmap;
+  var
+    saveDialog: tsavedialog; // Save dialog variable
+  begin
+    saveDialog := tsavedialog.Create(Self);
+    saveDialog.Title := 'Save your Bitmap file';
+    saveDialog.InitialDir := GetCurrentDir;
+    saveDialog.Filter := 'Bitmap file|*.bmp';
+    saveDialog.DefaultExt := 'txt';
+    saveDialog.FilterIndex := 1;
+    if saveDialog.Execute then
+    begin
+      // Create Bitmap
+      bmp := tBitmap.Create;
+      bmp.width := PaintBox.width;
+      bmp.Height := PaintBox.Height;
+      BitBlt(bmp.Canvas.Handle, 0, 0, bmp.width, bmp.Height, PaintBox.Canvas.Handle, 0, 0, SRCCOPY);
+      try
+        bmp.SavetoFile(saveDialog.Filename);
+      finally
+        bmp.Free;
+        ShowMessage('File : ' + ExtractFileName(saveDialog.Filename) + ' was successfully saved.');
+
+      end;
+    end
+    else
+      ShowMessage('Save file was cancelled');
+
+    saveDialog.Free;
+
+  end;
+
+end.

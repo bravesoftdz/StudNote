@@ -1,0 +1,16 @@
+program StudNote;
+
+uses
+  Forms,
+  FormMain in 'View\FormMain.pas' {MainForm},
+  AboutSN in 'View\AboutSN.pas' {frmAboutSN};
+
+{$R *.res}
+
+begin
+  Application.Initialize;
+  Application.MainFormOnTaskbar := True;
+  Application.CreateForm(TMainForm, MainForm);
+  Application.CreateForm(TfrmAboutSN, frmAboutSN);
+  Application.Run;
+end.

@@ -54,6 +54,8 @@ type
     BalloonHint: TBalloonHint;
     A1: TMenuItem;
     I1: TMenuItem;
+    BitBtnChart: TBitBtn;
+    BitBtnEdit: TBitBtn;
     procedure FormCreate(Sender: TObject);
     procedure AddButtonClick(Sender: TObject);
     procedure DelButtonClick(Sender: TObject);
@@ -63,6 +65,12 @@ type
     procedure StringGridDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
     procedure StringGridMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure I1Click(Sender: TObject);
+    procedure BitBtnChartClick(Sender: TObject);
+    procedure NameEditChange(Sender: TObject);
+    procedure FreEditChange(Sender: TObject);
+    procedure EngEditChange(Sender: TObject);
+    procedure MathEditChange(Sender: TObject);
+    procedure BitBtnEditClick(Sender: TObject);
   private
     fStudentArr: array of TStudentData;
     fSumArr: array [0 .. 3] of Integer;
@@ -73,6 +81,8 @@ type
     procedure writeIniDatei;
     procedure LoadIniDatei;
     procedure ShowCellHint(X, Y: Integer);
+    function ADDpermisition: boolean;
+    procedure EditStudent(aName: String);
 
     { Private declarations }
   public
@@ -85,7 +95,7 @@ var
 implementation
 
 uses
-  System.IniFiles, AboutSN;
+  System.IniFiles, AboutSN, ChartStudent;
 
 {$R *.dfm}
 
@@ -93,15 +103,17 @@ var
   iniFolder, iniPath: String;
   Bitmap1, Bitmap2, Bitmap3: TBitmap;
   LastRow, LastCol: Integer;
-  AColLastCol, ARowLastRow: Boolean;
+  AColLastCol, ARowLastRow: boolean;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   MainForm.KeyPreview := True;
-//  ------------------------------------  //
+  // ------------------------------------  //
   MathEdit.NumbersOnly := True;
   FreEdit.NumbersOnly := True;
   EngEdit.NumbersOnly := True;
+
+  AddButton.Enabled := False;
 
   iniFolder := ExtractFilePath(Application.ExeName) + iniFile;
   ForceDirectories(iniFolder);
@@ -125,6 +137,11 @@ begin
   writeIniDatei;
 end;
 
+procedure TMainForm.FreEditChange(Sender: TObject);
+begin
+  AddButton.Enabled := ADDpermisition;
+end;
+
 procedure TMainForm.I1Click(Sender: TObject);
 begin
   frmAboutSN.Show;
@@ -135,9 +152,15 @@ begin
   Close;
 end;
 
+procedure TMainForm.NameEditChange(Sender: TObject);
+begin
+  AddButton.Enabled := ADDpermisition;
+end;
+
 procedure TMainForm.AddButtonClick(Sender: TObject);
 begin
   AddStudent(NameEdit.Text, StrToInt(FreEdit.Text), StrToInt(EngEdit.Text), StrToInt(MathEdit.Text));
+  AddButton.Enabled := False;
 end;
 
 procedure TMainForm.AddStudent(aName: String; aFre, aEng, aMath: Integer);
@@ -169,6 +192,44 @@ begin
   DoOutput(aIndex, aName);
 end;
 
+function TMainForm.ADDpermisition: boolean;
+begin
+  result := ((Length(NameEdit.Text) > 0) and (Length(MathEdit.Text) > 0) and (Length(EngEdit.Text) > 0) and (Length(FreEdit.Text) > 0));
+end;
+
+procedure TMainForm.BitBtnChartClick(Sender: TObject);
+begin
+  //
+
+  Application.CreateForm(TfrmChartStudent, frmChartStudent);
+  try
+    frmChartStudent.ShowModal;
+  finally
+    FreeAndNil(frmChartStudent)
+  end;
+end;
+
+procedure TMainForm.BitBtnEditClick(Sender: TObject);
+var
+  Ycol: Integer;
+  studentName: string;
+begin
+  if AddButton.Enabled then
+  begin
+    AddButtonClick(nil);
+    exit;
+  end;
+
+  Ycol := StringGrid.Selection.BottomRight.Y;
+  if (Ycol > -1) then
+  begin
+    studentName := StringGrid.Cells[0, Ycol];
+
+    EditStudent(studentName);
+
+  end;
+end;
+
 procedure TMainForm.btnClick(Sender: TObject);
 begin
   ShowMessage(StringGrid.Cells[0, 1]);
@@ -196,6 +257,31 @@ begin
     fStudentArr[aIndex] := fStudentArr[aArrLeng - 1];
     SetLength(fStudentArr, aArrLeng - 1);
     DoOutput(-1, aName);
+  end;
+end;
+
+procedure TMainForm.EditStudent(aName: String);
+var
+  i, aIndex, aArrLeng: Integer;
+begin
+  aArrLeng := Length(fStudentArr);
+  aIndex := -1;
+  for i := 0 to aArrLeng - 1 do
+  begin
+    if fStudentArr[i].iName = aName then
+    begin
+      aIndex := i;
+      Break;
+    end;
+  end;
+  if aIndex >= 0 then
+  begin
+    NameEdit.Text := aName;
+    FreEdit.Text := (fStudentArr[aIndex].iFre).ToString;
+    EngEdit.Text := (fStudentArr[aIndex].iEng).ToString;
+    MathEdit.Text := (fStudentArr[aIndex].iMath).ToString;
+
+    DoOutput(aIndex, aName);
   end;
 end;
 
@@ -234,12 +320,9 @@ procedure TMainForm.ShowCellHint(X, Y: Integer);
 var
   ACol, ARow: Integer;
 begin
-  // ShowHint auf True setzen
   if StringGrid.ShowHint = False then
     StringGrid.ShowHint := True;
-  // Col und Row Position lesen
   StringGrid.MouseToCell(X, Y, ACol, ARow);
-  // wenn im gültigen Bereich zeige Zelleninhalt als Hint
   if (ACol > -1) and (ARow > -1) then
     StringGrid.Hint := StringGrid.Cells[ACol, ARow];
   // if (AColLastCol) or (ARowLastRow) then
@@ -253,6 +336,11 @@ end;
 procedure TMainForm.DelButtonClick(Sender: TObject);
 begin
   RemoveStudent(NameEdit.Text);
+  NameEdit.Clear;
+  MathEdit.Clear;
+  FreEdit.Clear;
+  EngEdit.Clear;
+  
 end;
 
 procedure TMainForm.DoOutput(aArrIndex: Integer; aName: String);
@@ -271,7 +359,7 @@ begin
       end;
     end;
     if aGridIndex < -1 then
-      Exit
+      exit
     else
     begin
       for i := aGridIndex to StringGrid.RowCount - 1 do
@@ -309,13 +397,18 @@ begin
     StringGrid.Cells[1, aGridIndex] := IntToStr(fStudentArr[aArrIndex].iFre);
     StringGrid.Cells[2, aGridIndex] := IntToStr(fStudentArr[aArrIndex].iEng);
     StringGrid.Cells[3, aGridIndex] := IntToStr(fStudentArr[aArrIndex].iMath);
-    StringGrid.Cells[4, aGridIndex] := FloatToStr(fStudentArr[aArrIndex].iMoy);
+    StringGrid.Cells[4, aGridIndex] := FormatFloat('0.00', fStudentArr[aArrIndex].iMoy);
   end;
-  KorPanel.Caption := FloatToStr(fSumArr[0] / (StringGrid.RowCount - 1));
-  EngPanel.Caption := FloatToStr(fSumArr[1] / (StringGrid.RowCount - 1));
-  MathPanel.Caption := FloatToStr(fSumArr[2] / (StringGrid.RowCount - 1));
-  TotalPanel.Caption := FloatToStr((fSumArr[0] + fSumArr[1] + fSumArr[2]) / ((StringGrid.RowCount - 1) * 3));
+  KorPanel.Caption := FormatFloat('0.00', fSumArr[0] / (StringGrid.RowCount - 1));
+  EngPanel.Caption := FormatFloat('0.00', fSumArr[1] / (StringGrid.RowCount - 1));
+  MathPanel.Caption := FormatFloat('0.00', fSumArr[2] / (StringGrid.RowCount - 1));
+  TotalPanel.Caption := FormatFloat('0.00', (fSumArr[0] + fSumArr[1] + fSumArr[2]) / ((StringGrid.RowCount - 1) * 3));
 
+end;
+
+procedure TMainForm.EngEditChange(Sender: TObject);
+begin
+  AddButton.Enabled := ADDpermisition;
 end;
 
 procedure TMainForm.writeIniDatei;
@@ -352,7 +445,7 @@ var
   Astudent: string;
 begin
   if not FileExists(iniPath) then
-    Exit;
+    exit;
 
   oSL := TStringlist.Create;
   try
@@ -362,7 +455,7 @@ begin
     oSL.Free;
   end;
   if (iline <= 0) then
-    Exit;
+    exit;
 
   sIniDatei := TIniFile.Create(iniPath);
 
@@ -378,6 +471,11 @@ begin
   end;
 
   sIniDatei.Free;
+end;
+
+procedure TMainForm.MathEditChange(Sender: TObject);
+begin
+  AddButton.Enabled := ADDpermisition;
 end;
 
 end.
