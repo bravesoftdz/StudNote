@@ -6,7 +6,8 @@ save student grades and calculate the average
 # Features  
 
 - Calculate the average of each students.
-- Save and load student grades using inifile.
+- Save and Load student grades using inifile.
+- Create A Graph and export to Bitmap Fomat.
 
 
 
