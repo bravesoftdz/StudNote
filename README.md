@@ -1,5 +1,5 @@
 # StudNote
-save student grades and calculate the average
+Save student grades and calculate the average
 ![](StudNote_.png) 
 
 
